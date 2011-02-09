@@ -9,7 +9,6 @@
 #include <sstream>
 #include <exception>
 #include <memory>
-#include <windows.h> // only for PtrToInt and IntToPtr
 
 extern "C" 
 {
@@ -18,27 +17,12 @@ extern "C"
   #include "lua/lauxlib.h"
 }
 
-#ifdef UNIT_TEST
-  class LuaStackChecker
-  {
-   public:
-    LuaStackChecker(lua_State* a_LuaState,
-                        const char* a_FileName = "", int a_Line = 0);
-    ~LuaStackChecker();
-
-   private:
-    void OnFail(const std::string& a_Message);
-    
-    lua_State*  m_LuaState;
-    int         m_TopValue;
-    const char* m_FileName;
-    int         m_Line;
-  };
-#  define CHECK_LUA_STACK(a_LuaState) \
-                    LuaStackChecker guad(a_LuaState, __FILE__, __LINE__)
-#else 
-#  define CHECK_LUA_STACK(a_LuaState)
-#endif // UNIT_TEST
+#define IntToPointer(a_Integer) reinterpret_cast<void*>(a_Integer)
+#if defined(__x86_64__) || defined(__amd64__)
+#  define PointerToInt(a_Pointer) reinterpret_cast<long long>(a_Pointer)
+#else
+#  define PointerToInt(a_Pointer) reinterpret_cast<long>(a_Pointer)
+#endif
 
 class LuaScript
 {
@@ -199,7 +183,8 @@ class LuaScript
  protected:
   LuaScript(const LuaScript&);
   void operator = (const LuaScript&);
-
+  lua_State* m_LuaState;
+ 
  private:
   class LuaDeleter
   {
@@ -210,8 +195,6 @@ class LuaScript
       delete a_Item;
     }
   };
-
-  lua_State* m_LuaState;
 };
 
 template<class LuaImplFuncType>
@@ -288,13 +271,12 @@ int LuaScript::LuaCallback(lua_State* a_LuaState)
   {
     LuaScript::Int_LuaArg firstParametr = 
                   dynamic_cast<LuaScript::Int_LuaArg&>(*inArgs->at(0));
-    parent = static_cast<LuaScript*>(IntToPtr(firstParametr.GetValue()));
+    parent = static_cast<LuaScript*>(IntToPointer(firstParametr.GetValue()));
     inArgs->pop_front();
   }
 
   LuaImplFuncType funcClass(parent);
   {
-    CHECK_LUA_STACK(a_LuaState);
     funcClass.Calc(*inArgs, *outArgs);
   }
   outArgs->PushToLua(a_LuaState);
@@ -304,8 +286,6 @@ int LuaScript::LuaCallback(lua_State* a_LuaState)
 template<class LuaImplFuncType>
 void LuaScript::RegisterFunction() 
 {
-  CHECK_LUA_STACK(m_LuaState);
-  
   const std::string sNameSpace  = LuaFunc<LuaImplFuncType>::NameSpace();
   const std::string sName       = LuaFunc<LuaImplFuncType>::Name();
   if( sNameSpace.empty() )
@@ -315,7 +295,7 @@ void LuaScript::RegisterFunction()
   }
   
   std::stringstream strThis;
-  strThis << PtrToInt(this);
+  strThis << PointerToInt(this);
 
   std::string script = 
     std::string("if ") + sNameSpace + " == nil or " + 
@@ -354,8 +334,6 @@ void LuaScript::RegisterFunction()
 template<class LuaArgType>
 LuaArgType LuaScript::GetVariable(const std::string& a_Name) 
 {
-  CHECK_LUA_STACK(m_LuaState);
-
   lua_getglobal(m_LuaState, a_Name.c_str());
   LuaArgType val;
   int index = lua_gettop(m_LuaState);

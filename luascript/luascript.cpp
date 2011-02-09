@@ -3,37 +3,6 @@
 #include "luascript/luascript.h"
 #include <algorithm>
 
-#ifdef UNIT_TEST 
-#  include "gtest/gtest.h"
-
-  LuaStackChecker::LuaStackChecker(lua_State* a_LuaState,
-                                const char* a_FileName, int a_Line):
-    m_LuaState(a_LuaState),
-    m_FileName(a_FileName),
-    m_Line(a_Line)
-  {
-    m_TopValue = lua_gettop(m_LuaState);
-  }
-
-  LuaStackChecker::~LuaStackChecker()
-  {
-    int newTop = lua_gettop(m_LuaState);
-    if(m_TopValue != newTop)
-    {
-      std::stringstream fmt;
-      fmt << "Lua stack corrupted!\n"
-        "File " << m_FileName << " line " << m_Line << "\n"
-        "last_top = " << m_TopValue << " new_top " << newTop;
-      OnFail(fmt.str());
-    }
-  }
-  
-  void LuaStackChecker::OnFail(const std::string& a_Message)
-  {
-    FAIL() << a_Message;
-  }
-#endif // UNIT_TEST
-
 LuaScript::LuaScript() 
 {
   m_LuaState = lua_open();
@@ -52,8 +21,6 @@ LuaScript::iLuaArg* LuaScript::Bool_LuaArg::Clone() const
 
 void LuaScript::Bool_LuaArg::Unpack(lua_State* a_LuaState, int a_ParamIndex)
 {
-  CHECK_LUA_STACK(a_LuaState);
-
   if( lua_isboolean(a_LuaState, a_ParamIndex) )
     m_Value = lua_toboolean(a_LuaState, a_ParamIndex) ? true : false;
   else
@@ -91,8 +58,6 @@ LuaScript::iLuaArg* LuaScript::Int_LuaArg::Clone() const
 
 void LuaScript::Int_LuaArg::Unpack(lua_State* a_LuaState, int a_ParamIndex)
 {
-  CHECK_LUA_STACK(a_LuaState);
-  
   if( lua_isnumber(a_LuaState, a_ParamIndex) )
     m_Value = LuaValueType(lua_tointeger(a_LuaState, a_ParamIndex));
   else
@@ -130,8 +95,6 @@ LuaScript::iLuaArg* LuaScript::String_LuaArg::Clone() const
 
 void LuaScript::String_LuaArg::Unpack(lua_State* a_LuaState, int a_ParamIndex)
 {
-  CHECK_LUA_STACK(a_LuaState);
-
   if( lua_isstring(a_LuaState, a_ParamIndex) )
     m_Value = lua_tostring(a_LuaState, a_ParamIndex);
   else
@@ -167,8 +130,6 @@ LuaScript::iLuaArg* LuaScript::VectorInt_LuaArg::Clone() const
 void LuaScript::VectorInt_LuaArg::Unpack(lua_State* a_LuaState,
                                                 int a_ParamIndex)
 {
-  CHECK_LUA_STACK(a_LuaState);
-
   if( !lua_istable(a_LuaState, a_ParamIndex) )
     throw LuaException("VectorInt_LuaArg::Unpack(), value is not table");
 
@@ -233,8 +194,6 @@ LuaScript::iLuaArg* LuaScript::VectorString_LuaArg::Clone() const
 void LuaScript::VectorString_LuaArg::Unpack(lua_State* a_LuaState,
                                                     int a_ParamIndex)
 {
-  CHECK_LUA_STACK(a_LuaState);
-
   if( !lua_istable(a_LuaState, a_ParamIndex) )
     throw LuaException("VectorString_LuaArg::Unpack(), value is not table");
 

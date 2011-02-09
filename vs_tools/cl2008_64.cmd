@@ -1,0 +1,1 @@
+@"%VS90COMNTOOLS%\..\..\VC\vcvarsall.bat" x64

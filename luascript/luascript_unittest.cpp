@@ -1,12 +1,17 @@
 ﻿// Copyright (c) 2009-2011 by Alexander Demin and Alexei Bezborodov
 
-#ifdef UNIT_TEST
-
 #include "gtest/gtest.h"
 #include "luascript/luascript.h"
 
 #include <fstream>
 #include <string>
+
+TEST(LuaScript, PointerCast)
+{
+  LuaScript luaScript;
+  EXPECT_EQ(&luaScript, IntToPointer(PointerToInt(&luaScript)));
+  EXPECT_EQ(-1, PointerToInt(IntToPointer(-1)));
+}
 
 TEST(LuaScript, UrlParsingExample)
 {
@@ -450,4 +455,157 @@ TEST(LuaScript, CheckNullNameSpaceFunction)
   }
 }
 
-#endif
+class TestStackLuaScript: public LuaScript
+{
+ public:
+  lua_State* GetLuaState() const;
+};
+
+lua_State* TestStackLuaScript::GetLuaState() const
+{
+  return m_LuaState;
+}
+
+class LuaStackChecker
+{
+ public:
+  LuaStackChecker(lua_State* a_LuaState,
+                      const char* a_FileName = "", int a_Line = 0);
+  ~LuaStackChecker();
+
+ private:
+  void OnFail(const std::string& a_Message);
+  
+  lua_State*  m_LuaState;
+  int         m_TopValue;
+  const char* m_FileName;
+  int         m_Line;
+};
+
+LuaStackChecker::LuaStackChecker(lua_State* a_LuaState,
+                              const char* a_FileName, int a_Line):
+  m_LuaState(a_LuaState),
+  m_FileName(a_FileName),
+  m_Line(a_Line)
+{
+  m_TopValue = lua_gettop(m_LuaState);
+}
+
+LuaStackChecker::~LuaStackChecker()
+{
+  int newTop = lua_gettop(m_LuaState);
+  if( m_TopValue != newTop )
+  {
+    std::stringstream fmt;
+    fmt << "Lua stack corrupted!\n"
+      "File " << m_FileName << " line " << m_Line << "\n"
+      "last_top = " << m_TopValue << " new_top " << newTop;
+    OnFail(fmt.str());
+  }
+}
+
+void LuaStackChecker::OnFail(const std::string& a_Message)
+{
+  FAIL() << a_Message;
+}
+
+#define CHECK_LUA_STACK(a_LuaState) \
+                    LuaStackChecker guad(a_LuaState, __FILE__, __LINE__)
+
+TEST(LuaScript, CheckStack_GetVariable)
+{
+  try 
+  {
+    TestStackLuaScript luaScript;
+    CHECK_LUA_STACK(luaScript.GetLuaState());
+    
+    luaScript.Execute("b = true; i = 10; d = 1.5; s = 'str1'; vect1 = {1, 0}");
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
+      EXPECT_EQ(true,
+          luaScript.GetVariable<LuaScript::Bool_LuaArg>("b").GetValue());
+    }
+
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
+      EXPECT_EQ(10,
+          luaScript.GetVariable<LuaScript::Int_LuaArg>("i").GetValue());
+    }
+
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
+      EXPECT_EQ(std::string("str1"),
+        luaScript.GetVariable<LuaScript::String_LuaArg>("s").GetValue());
+    }
+
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
+      typedef LuaScript::VectorInt_LuaArg VectInt;
+      EXPECT_EQ(2,
+        luaScript.GetVariable<VectInt>("vect1").GetValue().size());
+    }
+  }
+  catch(const LuaScript::LuaException& e) 
+  {
+    FAIL() << "error: " << e.Error() << ", line " << e.Line();
+  }
+}
+
+TEST(LuaScript, CheckStack_SetVariable)
+{
+  try 
+  {
+    TestStackLuaScript luaScript;
+    CHECK_LUA_STACK(luaScript.GetLuaState());
+    
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
+      luaScript.SetVariable<LuaScript::Bool_LuaArg>("b", true);
+    }
+
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
+      luaScript.SetVariable<LuaScript::Int_LuaArg>("i", 10);
+    }
+
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
+      luaScript.SetVariable<LuaScript::String_LuaArg>("s", "str1");
+    }
+
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
+      typedef LuaScript::VectorInt_LuaArg VectInt;
+      luaScript.SetVariable<VectInt>("vect1", std::vector<int>(2));
+    }
+  }
+  catch(const LuaScript::LuaException& e) 
+  {
+    FAIL() << "error: " << e.Error() << ", line " << e.Line();
+  }
+}
+
+TEST(LuaScript, CheckStack_Function)
+{
+  try 
+  {
+    TestStackLuaScript luaScript;
+    CHECK_LUA_STACK(luaScript.GetLuaState());
+
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
+      luaScript.RegisterFunction< LuaReturnSomeFunction >();
+    }
+
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
+      luaScript.RegisterFunction< LuaNullNameSpaceFunction >();
+    }
+    
+    luaScript.Execute("b, i, s = test.return_list(); b1 = return_true();");
+  }
+  catch(const LuaScript::LuaException& e) 
+  {
+    FAIL() << "error: " << e.Error() << ", line " << e.Line();
+  }
+}
