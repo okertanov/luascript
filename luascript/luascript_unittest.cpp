@@ -73,8 +73,116 @@ TEST(LuaScript, SetGetVariable)
     luaScript.Execute("b = a;");
     EXPECT_EQ(false,
             luaScript.GetVariable<LuaScript::Bool_LuaArg>("b").GetValue());
+            
+    luaScript.SetVariable<LuaScript::Double_LuaArg>("a", 3.1415926);
+    luaScript.Execute("b = a;");
+    EXPECT_DOUBLE_EQ(3.1415926,
+          luaScript.GetVariable<LuaScript::Double_LuaArg>("b").GetValue());
   }
   catch(const LuaScript::LuaException& e)
+  {
+    FAIL() << "error: " << e.Error() << ", line " << e.Line();
+  }
+}
+
+TEST(LuaScript, SetGetVectorVariable)
+{
+  try
+  {
+    LuaScript luaScript;
+
+    std::vector<bool> vect0;
+    vect0.push_back(true);
+    vect0.push_back(false);
+    vect0.push_back(true);
+    luaScript.SetVariable<LuaScript::VectorBool_LuaArg>("a", vect0);
+    luaScript.Execute("b = a;");
+    std::vector<bool> retVect0 = 
+      luaScript.GetVariable<LuaScript::VectorBool_LuaArg>("b").GetValue();
+    ASSERT_EQ(3, retVect0.size());
+    EXPECT_EQ(true, retVect0[0]);
+    EXPECT_EQ(false, retVect0[1]);
+    EXPECT_EQ(true, retVect0[2]);
+
+    std::vector<int> vect1;
+    vect1.push_back(-1);
+    vect1.push_back(0);
+    vect1.push_back(2);
+    luaScript.SetVariable<LuaScript::VectorInt_LuaArg>("a", vect1);
+    luaScript.Execute("b = a;");
+    std::vector<int> retVect1 = 
+      luaScript.GetVariable<LuaScript::VectorInt_LuaArg>("b").GetValue();
+    ASSERT_EQ(3, retVect1.size());
+    EXPECT_EQ(-1, retVect1[0]);
+    EXPECT_EQ(0, retVect1[1]);
+    EXPECT_EQ(2, retVect1[2]);
+
+    std::vector<double> vect2;
+    vect2.push_back(0.0);
+    vect2.push_back(10.5);
+    luaScript.SetVariable<LuaScript::VectorDouble_LuaArg>("a", vect2);
+    luaScript.Execute("b = a;");
+    std::vector<double> retVect2 = 
+      luaScript.GetVariable<LuaScript::VectorDouble_LuaArg>("b").GetValue();
+    ASSERT_EQ(2, retVect2.size());
+    EXPECT_DOUBLE_EQ(0.0, retVect2[0]);
+    EXPECT_DOUBLE_EQ(10.5, retVect2[1]);
+
+    std::vector<std::string> vect3;
+    vect3.push_back("str1");
+    vect3.push_back("str2");
+    luaScript.SetVariable<LuaScript::VectorString_LuaArg>("a", vect3);
+    luaScript.Execute("b = a;");
+    std::vector<std::string> retVect3 = 
+      luaScript.GetVariable<LuaScript::VectorString_LuaArg>("b").GetValue();
+    ASSERT_EQ(2, retVect3.size());
+    EXPECT_EQ("str1", retVect3[0]);
+    EXPECT_EQ("str2", retVect3[1]);
+  }
+  catch(const LuaScript::LuaException& e)
+  {
+    FAIL() << "error: " << e.Error() << ", line " << e.Line();
+  }
+}
+
+TEST(LuaScript, SetGetVector2DVariable) 
+{
+  try 
+  {
+    LuaScript luaScript;
+
+    std::vector< std::vector<int> > vect2D;
+    std::vector<int> vect1;
+    vect1.push_back(-1);
+    vect1.push_back(0);
+    vect2D.push_back(vect1);
+    std::vector<int> vect2;
+    vect2.push_back(0);
+    vect2.push_back(1);
+    vect2.push_back(0xFFFF);
+    vect2D.push_back(vect2);
+
+    typedef 
+     LuaScript::Vector_LuaArg<LuaScript::Vector_LuaArg<LuaScript::Int_LuaArg> >
+                                                VectorInt2D;
+    
+    luaScript.SetVariable<VectorInt2D>("in2D", vect2D);
+    luaScript.Execute("ret2D = in2D;");
+    
+    std::vector< std::vector<int> > retVect2D =
+                          luaScript.GetVariable<VectorInt2D>("ret2D").GetValue();
+    
+    ASSERT_EQ(2, retVect2D.size());
+    ASSERT_EQ(2, retVect2D[0].size());
+    ASSERT_EQ(3, retVect2D[1].size());
+
+    EXPECT_EQ(-1, retVect2D[0][0]);
+    EXPECT_EQ(0, retVect2D[0][1]);
+    EXPECT_EQ(0, retVect2D[1][0]);
+    EXPECT_EQ(1, retVect2D[1][1]);
+    EXPECT_EQ(0xFFFF, retVect2D[1][2]);
+  }
+  catch(const LuaScript::LuaException& e) 
   {
     FAIL() << "error: " << e.Error() << ", line " << e.Line();
   }
@@ -201,6 +309,7 @@ class LuaReturnSomeFunction
     LuaScript::LuaArgArray* args = new LuaScript::LuaArgArray();
     args->Add(new LuaScript::Bool_LuaArg());
     args->Add(new LuaScript::Int_LuaArg());
+    args->Add(new LuaScript::Double_LuaArg());
     args->Add(new LuaScript::String_LuaArg());
     return args;
   }
@@ -212,7 +321,8 @@ class LuaReturnSomeFunction
   {
     dynamic_cast<LuaScript::Bool_LuaArg&>(*out[0]).SetValue(true);
     dynamic_cast<LuaScript::Int_LuaArg&>(*out[1]).SetValue(100);
-    dynamic_cast<LuaScript::String_LuaArg&>(*out[2]).SetValue("test");
+    dynamic_cast<LuaScript::Double_LuaArg&>(*out[2]).SetValue(-1.5);
+    dynamic_cast<LuaScript::String_LuaArg&>(*out[3]).SetValue("test");
   }
 };
 
@@ -222,11 +332,13 @@ TEST(LuaScript, ReturnSomeFromFunction)
   {
     LuaScript luaScript;
     luaScript.RegisterFunction< LuaReturnSomeFunction >();
-    luaScript.Execute("b, i, s = test.return_list();");
+    luaScript.Execute("b, i, d, s = test.return_list();");
     EXPECT_EQ(true,
            luaScript.GetVariable<LuaScript::Bool_LuaArg>("b").GetValue());
     EXPECT_EQ(100,
            luaScript.GetVariable<LuaScript::Int_LuaArg>("i").GetValue());
+    EXPECT_DOUBLE_EQ(-1.5,
+           luaScript.GetVariable<LuaScript::Double_LuaArg>("d").GetValue());
     EXPECT_EQ("test",
            luaScript.GetVariable<LuaScript::String_LuaArg>("s").GetValue());
   }
@@ -250,6 +362,7 @@ class LuaReturnEqualParamFunction
     args->Add(new LuaScript::Bool_LuaArg());
     args->Add(new LuaScript::VectorInt_LuaArg());
     args->Add(new LuaScript::VectorString_LuaArg());
+    args->Add(new LuaScript::Vector_LuaArg<LuaScript::VectorString_LuaArg>());
     return args;
   }
 
@@ -262,6 +375,7 @@ class LuaReturnEqualParamFunction
     args->Add(new LuaScript::Bool_LuaArg());
     args->Add(new LuaScript::VectorInt_LuaArg());
     args->Add(new LuaScript::VectorString_LuaArg());
+    args->Add(new LuaScript::Vector_LuaArg<LuaScript::VectorString_LuaArg>());
     return args;
   }
 
@@ -282,6 +396,10 @@ class LuaReturnEqualParamFunction
             dynamic_cast<LuaScript::VectorInt_LuaArg&>(*in[4]).GetValue());
     dynamic_cast<LuaScript::VectorString_LuaArg&>(*out[5]).SetValue(
             dynamic_cast<LuaScript::VectorString_LuaArg&>(*in[5]).GetValue());
+    dynamic_cast<LuaScript::Vector_LuaArg
+        <LuaScript::VectorString_LuaArg>&>(*out[6]).SetValue(
+            dynamic_cast<LuaScript::Vector_LuaArg
+                <LuaScript::VectorString_LuaArg>&>(*in[6]).GetValue());
   }
 };
 
@@ -298,11 +416,12 @@ TEST(LuaScript, MultiReturnEqualFromFunction)
       " 'test2', "
       " 'qwertyuiop[]asdfghjkl;zxcvbnm,./`1234567890-=' "
       " };"
-      "b, i, s, b1, retTable, retStringTable = "
+      "local testTable2d = { { 'str00' , 'str01' } , { 'str10' , 'str11' } };"
+      "b, i, s, b1, retTable, retStringTable, retTable2d  = "
       "  test.return_list("
-      "    true, 10, \"test\", false, testTable, testStringTable"
+      "    true, 10, \"test\", false, testTable, testStringTable, testTable2d"
       "  );";
-    luaScript.Execute(strScript.c_str());
+    luaScript.Execute(strScript);
     EXPECT_EQ(true,
         luaScript.GetVariable<LuaScript::Bool_LuaArg>("b").GetValue());
     EXPECT_EQ(10,
@@ -324,11 +443,24 @@ TEST(LuaScript, MultiReturnEqualFromFunction)
     std::vector<std::string> retStr =
         luaScript.GetVariable<LuaVectorString>("retStringTable").GetValue();
     ASSERT_EQ(4, retStr.size());
-    EXPECT_STREQ("test0", retStr[0].c_str());
-    EXPECT_STREQ("test1", retStr[1].c_str());
-    EXPECT_STREQ("test2", retStr[2].c_str());
-    EXPECT_STREQ("qwertyuiop[]asdfghjkl;zxcvbnm,./`1234567890-=",
-        retStr[3].c_str());
+    EXPECT_EQ("test0", retStr[0]);
+    EXPECT_EQ("test1", retStr[1]);
+    EXPECT_EQ("test2", retStr[2]);
+    EXPECT_EQ("qwertyuiop[]asdfghjkl;zxcvbnm,./`1234567890-=",
+        retStr[3]);
+
+    typedef 
+      LuaScript::Vector_LuaArg<LuaScript::VectorString_LuaArg> LuaVectorStr2D;
+    std::vector< std::vector<std::string> > ret2D =
+        luaScript.GetVariable<LuaVectorStr2D>("retTable2d").GetValue();
+    ASSERT_EQ(2, ret2D.size());
+    ASSERT_EQ(2, ret2D[0].size());
+    ASSERT_EQ(2, ret2D[1].size());
+
+    EXPECT_EQ("str00", ret2D[0][0]);
+    EXPECT_EQ("str01", ret2D[0][1]);
+    EXPECT_EQ("str10", ret2D[1][0]);
+    EXPECT_EQ("str11", ret2D[1][1]);
   }
   catch(const LuaScript::LuaException& e) 
   {
@@ -534,6 +666,12 @@ TEST(LuaScript, CheckStack_GetVariable)
 
     {
       CHECK_LUA_STACK(luaScript.GetLuaState());
+      EXPECT_DOUBLE_EQ(1.5,
+          luaScript.GetVariable<LuaScript::Double_LuaArg>("d").GetValue());
+    }
+
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
       EXPECT_EQ(std::string("str1"),
         luaScript.GetVariable<LuaScript::String_LuaArg>("s").GetValue());
     }
@@ -566,6 +704,11 @@ TEST(LuaScript, CheckStack_SetVariable)
     {
       CHECK_LUA_STACK(luaScript.GetLuaState());
       luaScript.SetVariable<LuaScript::Int_LuaArg>("i", 10);
+    }
+
+    {
+      CHECK_LUA_STACK(luaScript.GetLuaState());
+      luaScript.SetVariable<LuaScript::Double_LuaArg>("d", 1.5);
     }
 
     {

@@ -79,6 +79,25 @@ class LuaScript
     LuaValueType m_Value;
   };
 
+  class Double_LuaArg: public iLuaArg
+  {
+   public:
+    typedef double LuaValueType;
+
+    Double_LuaArg() : m_Value(0) { }
+    Double_LuaArg(LuaValueType a_Value) : m_Value(a_Value) { }
+
+    virtual iLuaArg*    Clone() const;
+    virtual void        Unpack(lua_State* a_LuaState, int a_ParamIndex);
+    virtual void        Pack(lua_State* a_LuaState);
+    std::string         AsString() const;
+    const LuaValueType& GetValue() const;
+    void                SetValue(LuaValueType a_Value);
+
+   private:
+    LuaValueType m_Value;
+  };
+  
   class String_LuaArg: public iLuaArg
   {
    public:
@@ -98,44 +117,35 @@ class LuaScript
     LuaValueType m_Value;
   };
 
-  class VectorInt_LuaArg: public iLuaArg
+  template<class LuaArgType>
+  class Vector_LuaArg: public iLuaArg
   {
    public:
-    typedef std::vector<int> LuaValueType;
+    typedef typename LuaArgType::LuaValueType VectorType;
+    typedef std::vector<VectorType> LuaValueType;
 
-    VectorInt_LuaArg() : m_Value() {}
-    VectorInt_LuaArg(const LuaValueType& a_Value) : m_Value(a_Value) {}
+    Vector_LuaArg() : m_Value() {}
+    Vector_LuaArg(const LuaValueType& a_Value) : m_Value(a_Value) {}
 
     virtual iLuaArg*    Clone() const;
     virtual void        Unpack(lua_State* a_LuaState, int a_ParamIndex);
     virtual void        Pack(lua_State* a_LuaState);
     std::string         AsString() const;
-    const LuaValueType& GetValue() const;
+    const LuaValueType& GetValue() const
+    {
+      return m_Value; 
+    }
     void                SetValue(LuaValueType a_Value);
 
    private:
     LuaValueType m_Value;
   };
-
-  class VectorString_LuaArg: public iLuaArg
-  {
-   public:
-    typedef std::vector<std::string> LuaValueType;
-
-    VectorString_LuaArg() : m_Value() {}
-    VectorString_LuaArg(const LuaValueType& a_Value) : m_Value(a_Value) {}
-
-    virtual iLuaArg*    Clone() const;
-    virtual void        Unpack(lua_State* a_LuaState, int a_ParamIndex);
-    virtual void        Pack(lua_State* a_LuaState);
-    std::string         AsString() const;
-    const LuaValueType& GetValue() const;
-    void                SetValue(LuaValueType a_Value);
-
-   private:
-    LuaValueType m_Value;
-  };
-
+  
+  typedef Vector_LuaArg<Bool_LuaArg>   VectorBool_LuaArg;
+  typedef Vector_LuaArg<Int_LuaArg>    VectorInt_LuaArg;
+  typedef Vector_LuaArg<String_LuaArg> VectorString_LuaArg;
+  typedef Vector_LuaArg<Double_LuaArg> VectorDouble_LuaArg;
+  
   class LuaArgArray: public std::deque<iLuaArg*>
   {
    public:
@@ -349,6 +359,65 @@ void LuaScript::SetVariable(const std::string& a_Name,
   LuaArgType var(a_Value);
   var.Pack(m_LuaState);
   lua_setglobal(m_LuaState, a_Name.c_str());
+}
+
+template<class LuaArgType>
+LuaScript::iLuaArg* LuaScript::Vector_LuaArg<LuaArgType>::Clone() const
+{
+  return new Vector_LuaArg<LuaArgType>(m_Value);
+}
+
+template<class LuaArgType>
+void LuaScript::Vector_LuaArg<LuaArgType>::Unpack(lua_State* a_LuaState,
+                                                int a_ParamIndex)
+{
+  if( !lua_istable(a_LuaState, a_ParamIndex) )
+    throw LuaException("Vector_LuaArg::Unpack(), value is not table");
+
+  lua_pushvalue(a_LuaState, a_ParamIndex);
+  
+  m_Value.clear();
+  const int count = luaL_getn(a_LuaState, -1);
+  for( int i = 1; i <= count; ++i )
+  {
+    lua_pushnumber(a_LuaState, i);
+    lua_gettable(a_LuaState, -2);
+
+    LuaArgType newValue;
+    newValue.Unpack(a_LuaState, -1);
+
+    m_Value.push_back(newValue.GetValue());
+    lua_pop(a_LuaState, 1);
+  }
+  lua_pop(a_LuaState, 1);
+}
+
+template<class LuaArgType>
+void LuaScript::Vector_LuaArg<LuaArgType>::Pack(lua_State* a_LuaState)
+{
+  lua_newtable(a_LuaState);
+  const size_t size = m_Value.size();
+  for( size_t i = 0; i < m_Value.size() ; ++i )
+  {
+    lua_pushnumber(a_LuaState, i + 1);
+    LuaArgType val(m_Value[i]);
+    val.Pack(a_LuaState);
+    lua_settable(a_LuaState, -3);
+  }
+}
+
+template<class LuaArgType>
+std::string LuaScript::Vector_LuaArg<LuaArgType>::AsString() const
+{
+  std::stringstream fmt;
+  fmt << &m_Value;
+  return fmt.str();
+}
+
+template<class LuaArgType>
+void LuaScript::Vector_LuaArg<LuaArgType>::SetValue(LuaValueType a_Value)
+{
+  m_Value = a_Value;
 }
 
 #endif

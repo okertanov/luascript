@@ -88,6 +88,43 @@ LuaScript::Int_LuaArg::SetValue(LuaValueType a_Value)
   m_Value = a_Value;
 }
 
+LuaScript::iLuaArg* LuaScript::Double_LuaArg::Clone() const
+{ 
+  return new Double_LuaArg(m_Value);
+}
+
+void LuaScript::Double_LuaArg::Unpack(lua_State* a_LuaState, int a_ParamIndex)
+{
+  if( lua_isnumber(a_LuaState, a_ParamIndex) )
+    m_Value = LuaValueType(lua_tonumber(a_LuaState, a_ParamIndex));
+  else
+    throw LuaException("Double_LuaArg::Unpack(), value is not double");
+}
+
+void LuaScript::Double_LuaArg::Pack(lua_State* a_LuaState)
+{
+  lua_pushnumber(a_LuaState, m_Value);
+}
+
+std::string LuaScript::Double_LuaArg::AsString() const
+{
+  std::stringstream fmt;
+  fmt << m_Value;
+  return fmt.str();
+}
+
+const LuaScript::Double_LuaArg::LuaValueType& 
+LuaScript::Double_LuaArg::GetValue() const
+{ 
+  return m_Value; 
+}
+
+void 
+LuaScript::Double_LuaArg::SetValue(LuaValueType a_Value)
+{
+  m_Value = a_Value;
+}
+
 LuaScript::iLuaArg* LuaScript::String_LuaArg::Clone() const
 { 
   return new String_LuaArg(m_Value);
@@ -118,135 +155,6 @@ LuaScript::String_LuaArg::GetValue() const
 }
 
 void LuaScript::String_LuaArg::SetValue(LuaValueType a_Value)
-{
-  m_Value = a_Value;
-}
-
-LuaScript::iLuaArg* LuaScript::VectorInt_LuaArg::Clone() const
-{
-  return new VectorInt_LuaArg(m_Value);
-}
-
-void LuaScript::VectorInt_LuaArg::Unpack(lua_State* a_LuaState,
-                                                int a_ParamIndex)
-{
-  if( !lua_istable(a_LuaState, a_ParamIndex) )
-    throw LuaException("VectorInt_LuaArg::Unpack(), value is not table");
-
-  lua_pushvalue(a_LuaState, a_ParamIndex);
-  
-  m_Value.clear();
-  const int count = luaL_getn(a_LuaState, -1);
-  for( int i = 1; i <= count; ++i )
-  {
-    lua_pushnumber(a_LuaState, i);
-    lua_gettable(a_LuaState, -2);
-    
-    if( !lua_isnumber(a_LuaState, -1) )
-    {
-      std::stringstream fmt;
-      fmt << "VectorInt_LuaArg::Unpack(), value [" << i << "] is not number";
-      throw LuaException(fmt.str());
-    }
-    
-    int val = static_cast<int>(lua_tonumber(a_LuaState, -1));
-    m_Value.push_back(val);
-    lua_pop(a_LuaState, 1);
-  }
-  lua_pop(a_LuaState, 1);
-}
-
-void LuaScript::VectorInt_LuaArg::Pack(lua_State* a_LuaState)
-{
-  lua_newtable(a_LuaState);
-  const size_t size = m_Value.size();
-  for( size_t i = 0; i < m_Value.size() ; ++i )
-  {
-    lua_pushnumber(a_LuaState, i + 1);
-    lua_pushnumber(a_LuaState, m_Value[i]);
-    lua_settable(a_LuaState, -3);
-  }
-}
-
-std::string LuaScript::VectorInt_LuaArg::AsString() const
-{
-  std::stringstream fmt;
-  fmt << &m_Value;
-  return fmt.str();
-}
-
-const LuaScript::VectorInt_LuaArg::LuaValueType&
-LuaScript::VectorInt_LuaArg::GetValue() const
-{ 
-  return m_Value; 
-}
-
-void LuaScript::VectorInt_LuaArg::SetValue(LuaValueType a_Value)
-{
-  m_Value = a_Value;
-}
-
-LuaScript::iLuaArg* LuaScript::VectorString_LuaArg::Clone() const
-{
-  return new VectorString_LuaArg(m_Value);
-}
-
-void LuaScript::VectorString_LuaArg::Unpack(lua_State* a_LuaState,
-                                                    int a_ParamIndex)
-{
-  if( !lua_istable(a_LuaState, a_ParamIndex) )
-    throw LuaException("VectorString_LuaArg::Unpack(), value is not table");
-
-  lua_pushvalue(a_LuaState, a_ParamIndex);
-  
-  m_Value.clear();
-  const int count = luaL_getn(a_LuaState, -1);
-  for( int i = 1; i <= count; ++i )
-  {
-    lua_pushnumber(a_LuaState, i);
-    lua_gettable(a_LuaState, -2);
-    
-    if( !lua_isstring(a_LuaState, -1) )
-    {
-      std::stringstream fmt;
-      fmt << "VectorString_LuaArg::Unpack(), "
-        "value [" << i << "] is not string";
-      throw LuaException(fmt.str());
-    }
-    
-    std::string val = lua_tostring(a_LuaState, -1);
-    m_Value.push_back(val);
-    lua_pop(a_LuaState, 1);
-  }
-  lua_pop(a_LuaState, 1);
-}
-
-void LuaScript::VectorString_LuaArg::Pack(lua_State* a_LuaState)
-{
-  lua_newtable(a_LuaState);
-  const size_t size = m_Value.size();
-  for( size_t i = 0; i < m_Value.size() ; ++i )
-  {
-    lua_pushnumber(a_LuaState, i + 1);
-    lua_pushstring(a_LuaState, m_Value[i].c_str());
-    lua_settable(a_LuaState, -3);
-  }
-}
-
-std::string LuaScript::VectorString_LuaArg::AsString() const
-{
-  std::stringstream fmt;
-  fmt << &m_Value;
-  return fmt.str();
-}
-
-const LuaScript::VectorString_LuaArg::LuaValueType& 
-LuaScript::VectorString_LuaArg::GetValue() const
-{ 
-  return m_Value; 
-}
-
-void LuaScript::VectorString_LuaArg::SetValue(LuaValueType a_Value)
 {
   m_Value = a_Value;
 }
