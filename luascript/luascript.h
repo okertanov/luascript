@@ -279,16 +279,20 @@ int LuaScript::LuaCallback(lua_State* a_LuaState)
   LuaScript* parent = 0;
   if( !sNameSpace.empty() )
   {
-    LuaScript::Int_LuaArg firstParametr = 
-                  dynamic_cast<LuaScript::Int_LuaArg&>(*inArgs->at(0));
-    parent = static_cast<LuaScript*>(IntToPointer(firstParametr.GetValue()));
+    iLuaArg* firstParameter = inArgs->at(0);
+    LuaScript::Int_LuaArg parentAddress = 
+                  dynamic_cast<LuaScript::Int_LuaArg&>(*firstParameter);
+    parent = static_cast<LuaScript*>(IntToPointer(parentAddress.GetValue()));
     inArgs->pop_front();
+    LuaDeleter()(firstParameter);
   }
 
-  LuaImplFuncType funcClass(parent);
   {
+    LuaImplFuncType funcClass(parent);
+
     funcClass.Calc(*inArgs, *outArgs);
   }
+
   outArgs->PushToLua(a_LuaState);
   return static_cast<int>(outArgs->size());
 }
