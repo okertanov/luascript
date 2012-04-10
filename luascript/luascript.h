@@ -8,6 +8,7 @@
 #include <deque>
 #include <sstream>
 #include <exception>
+#include <algorithm>
 #include <memory>
 
 extern "C" 
@@ -60,19 +61,20 @@ class LuaScript
     bool m_Value;
   };
 
-  class Int_LuaArg: public iLuaArg
+  template<class IntType>
+  class Integer_LuaArg: public iLuaArg
   {
    public:
-    typedef int LuaValueType;
+    typedef IntType LuaValueType;
 
-    Int_LuaArg() : m_Value(0) { }
-    Int_LuaArg(LuaValueType a_Value) : m_Value(a_Value) { }
+    Integer_LuaArg() : m_Value(0) { }
+    Integer_LuaArg(LuaValueType a_Value) : m_Value(a_Value) { }
 
     virtual iLuaArg*    Clone() const;
     virtual void        Unpack(lua_State* a_LuaState, int a_ParamIndex);
     virtual void        Pack(lua_State* a_LuaState);
     std::string         AsString() const;
-    const LuaValueType& GetValue() const;
+    const IntType&      GetValue() const;
     void                SetValue(LuaValueType a_Value);
 
    private:
@@ -141,6 +143,9 @@ class LuaScript
     LuaValueType m_Value;
   };
   
+  typedef Integer_LuaArg<int>  Int_LuaArg;
+  typedef Double_LuaArg        Ptr_LuaArg;
+
   typedef Vector_LuaArg<Bool_LuaArg>   VectorBool_LuaArg;
   typedef Vector_LuaArg<Int_LuaArg>    VectorInt_LuaArg;
   typedef Vector_LuaArg<String_LuaArg> VectorString_LuaArg;
@@ -219,7 +224,7 @@ class LuaFunc
       args = const_cast<LuaScript::LuaArgArray *>
                                 (LuaImplFuncType::GetInputArgs());
       if( !LuaImplFuncType::NameSpace().empty() )
-        args->push_front(new LuaScript::Int_LuaArg());
+        args->push_front(new LuaScript::Ptr_LuaArg());
     }
     return args;
   }
@@ -280,19 +285,21 @@ int LuaScript::LuaCallback(lua_State* a_LuaState)
   if( !sNameSpace.empty() )
   {
     iLuaArg* firstParameter = inArgs->at(0);
-    LuaScript::Int_LuaArg parentAddress = 
-                  dynamic_cast<LuaScript::Int_LuaArg&>(*firstParameter);
-    parent = static_cast<LuaScript*>(IntToPointer(parentAddress.GetValue()));
-    inArgs->pop_front();
+    LuaScript::Ptr_LuaArg parentAddress = 
+                  dynamic_cast<LuaScript::Ptr_LuaArg&>(*firstParameter);
+
+    intptr_t ptr = static_cast<intptr_t>(parentAddress.GetValue());
+    parent = static_cast<LuaScript*>(IntToPointer(ptr));
+
     LuaDeleter()(firstParameter);
+    inArgs->pop_front();
   }
 
   {
     LuaImplFuncType funcClass(parent);
-
+  
     funcClass.Calc(*inArgs, *outArgs);
   }
-
   outArgs->PushToLua(a_LuaState);
   return static_cast<int>(outArgs->size());
 }
@@ -317,7 +324,7 @@ void LuaScript::RegisterFunction()
     sNameSpace + " = { m_This = " + strThis.str() + " }; "
     "end";
   Execute(script.c_str());
-  
+
   lua_register(m_LuaState, "t_CurFunction", LuaCallback<LuaImplFuncType>);
 
   script = 
@@ -364,6 +371,55 @@ void LuaScript::SetVariable(const std::string& a_Name,
   var.Pack(m_LuaState);
   lua_setglobal(m_LuaState, a_Name.c_str());
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+template<class IntType>
+LuaScript::iLuaArg* LuaScript::Integer_LuaArg<IntType>::Clone() const
+{ 
+  return new Integer_LuaArg<IntType>(m_Value);
+}
+
+template<class IntType>
+void LuaScript::Integer_LuaArg<IntType>::
+  Unpack(lua_State* a_LuaState, int a_ParamIndex)
+{
+  if( lua_isnumber(a_LuaState, a_ParamIndex) )
+    m_Value = LuaValueType(lua_tointeger(a_LuaState, a_ParamIndex));
+  else
+    throw 
+	  LuaException("Integer_LuaArg<IntType>::Unpack(), value is not integer");
+}
+
+template<class IntType>
+void LuaScript::Integer_LuaArg<IntType>::Pack(lua_State* a_LuaState)
+{
+  lua_pushinteger(a_LuaState, m_Value);
+}
+
+template<class IntType>
+std::string LuaScript::Integer_LuaArg<IntType>::AsString() const
+{
+  std::stringstream fmt;
+  fmt << m_Value;
+  return fmt.str();
+}
+
+template<class IntType>
+const IntType& 
+LuaScript::Integer_LuaArg<IntType>::GetValue() const
+{ 
+  return m_Value; 
+}
+
+template<class IntType>
+void 
+LuaScript::Integer_LuaArg<IntType>::SetValue(LuaValueType a_Value)
+{
+  m_Value = a_Value;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 template<class LuaArgType>
 LuaScript::iLuaArg* LuaScript::Vector_LuaArg<LuaArgType>::Clone() const

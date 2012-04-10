@@ -1,7 +1,8 @@
 ﻿// Copyright (c) 2009-2011 by Alexander Demin and Alexei Bezborodov
 
 #include "luascript/luascript.h"
-#include <algorithm>
+#include <sstream>
+#include <iostream>
 
 LuaScript::LuaScript() 
 {
@@ -13,6 +14,8 @@ LuaScript::~LuaScript()
 {
   lua_close(m_LuaState); 
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 LuaScript::iLuaArg* LuaScript::Bool_LuaArg::Clone() const
 { 
@@ -51,42 +54,7 @@ LuaScript::Bool_LuaArg::SetValue(LuaValueType a_Value)
   m_Value = a_Value;
 }
 
-LuaScript::iLuaArg* LuaScript::Int_LuaArg::Clone() const
-{ 
-  return new Int_LuaArg(m_Value);
-}
-
-void LuaScript::Int_LuaArg::Unpack(lua_State* a_LuaState, int a_ParamIndex)
-{
-  if( lua_isnumber(a_LuaState, a_ParamIndex) )
-    m_Value = LuaValueType(lua_tointeger(a_LuaState, a_ParamIndex));
-  else
-    throw LuaException("Int_LuaArg::Unpack(), value is not integer");
-}
-
-void LuaScript::Int_LuaArg::Pack(lua_State* a_LuaState)
-{
-  lua_pushinteger(a_LuaState, m_Value);
-}
-
-std::string LuaScript::Int_LuaArg::AsString() const
-{
-  std::stringstream fmt;
-  fmt << m_Value;
-  return fmt.str();
-}
-
-const LuaScript::Int_LuaArg::LuaValueType& 
-LuaScript::Int_LuaArg::GetValue() const
-{ 
-  return m_Value; 
-}
-
-void 
-LuaScript::Int_LuaArg::SetValue(LuaValueType a_Value)
-{
-  m_Value = a_Value;
-}
+////////////////////////////////////////////////////////////////////////////////
 
 LuaScript::iLuaArg* LuaScript::Double_LuaArg::Clone() const
 { 
@@ -125,6 +93,8 @@ LuaScript::Double_LuaArg::SetValue(LuaValueType a_Value)
   m_Value = a_Value;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 LuaScript::iLuaArg* LuaScript::String_LuaArg::Clone() const
 { 
   return new String_LuaArg(m_Value);
@@ -158,6 +128,8 @@ void LuaScript::String_LuaArg::SetValue(LuaValueType a_Value)
 {
   m_Value = a_Value;
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 LuaScript::LuaArgArray::LuaArgArray(const LuaScript::LuaArgArray& rhs)
 {
@@ -196,6 +168,8 @@ LuaScript::LuaArgArray* LuaScript::LuaArgArray::Clone() const
     copy->push_back((*i)->Clone());
   return copy;
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 LuaScript::LuaException::LuaException(const std::string& a_Message):
   m_Message(a_Message),
